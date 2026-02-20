@@ -1,0 +1,1092 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MindAR Export</title>
+    <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        font-family: "Segoe UI", sans-serif;
+        background: transparent;
+        overflow: hidden;
+      }
+
+      a-scene {
+        width: 100vw;
+        height: 100vh;
+      }
+
+      #status {
+        position: fixed;
+        left: 12px;
+        top: 12px;
+        z-index: 10;
+        color: #f5f5f5;
+        background: rgba(0, 0, 0, 0.5);
+        padding: 8px 10px;
+        border-radius: 6px;
+        font-size: 13px;
+      }
+
+      #controls {
+        position: fixed;
+        right: 12px;
+        top: 12px;
+        z-index: 10;
+        display: flex;
+        gap: 8px;
+      }
+
+      #start-ar {
+        border: 0;
+        border-radius: 6px;
+        padding: 8px 12px;
+        font-size: 13px;
+        font-weight: 600;
+        background: #1f8a4d;
+        color: #fff;
+        cursor: pointer;
+      }
+
+      #start-ar[disabled] {
+        opacity: 0.6;
+        cursor: default;
+      }
+
+      #video-controls {
+        position: fixed;
+        left: 50%;
+        bottom: 12px;
+        transform: translateX(-50%);
+        z-index: 10;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        background: rgba(0, 0, 0, 0.65);
+        color: #f8fafc;
+        padding: 10px 12px;
+        border-radius: 10px;
+        min-width: 280px;
+      }
+
+      .video-target-label {
+        width: 100%;
+        font-size: 12px;
+        opacity: 0.9;
+      }
+
+      .video-btn {
+        border: 0;
+        border-radius: 6px;
+        padding: 6px 10px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #0f172a;
+      }
+
+      .video-btn[disabled] {
+        opacity: 0.5;
+      }
+
+      .video-btn.play {
+        background: #22c55e;
+      }
+
+      .video-btn.pause {
+        background: #f59e0b;
+      }
+
+      .video-btn.stop {
+        background: #ef4444;
+        color: #fff;
+      }
+
+      .video-btn.restart {
+        background: #3b82f6;
+        color: #fff;
+      }
+
+      #video-volume {
+        width: 110px;
+      }
+
+      #video-controls.hidden {
+        display: none;
+      }
+
+      #model-controls {
+        position: fixed;
+        left: 12px;
+        bottom: 12px;
+        z-index: 10;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        max-width: 320px;
+        background: rgba(0, 0, 0, 0.65);
+        color: #f8fafc;
+        padding: 10px;
+        border-radius: 10px;
+      }
+
+      #model-controls.hidden {
+        display: none;
+      }
+
+      .model-target-label {
+        width: 100%;
+        font-size: 12px;
+        opacity: 0.9;
+      }
+
+      .model-help {
+        width: 100%;
+        font-size: 11px;
+        opacity: 0.75;
+      }
+
+      .model-tour-speed-row {
+        width: 100%;
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .model-tour-speed-row label {
+        font-size: 12px;
+      }
+
+      #model-tour-speed {
+        width: 100%;
+      }
+
+      .model-tour-speed-value {
+        min-width: 52px;
+        text-align: right;
+        font-size: 12px;
+      }
+
+      .model-btn {
+        border: 0;
+        border-radius: 6px;
+        padding: 6px 8px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .model-btn[disabled] {
+        opacity: 0.5;
+      }
+
+      .tour {
+        background: #38bdf8;
+        color: #082f49;
+      }
+
+      .tour.active {
+        background: #0ea5e9;
+        color: #e0f2fe;
+      }
+
+      .nav {
+        background: #d1fae5;
+        color: #064e3b;
+      }
+
+      .rotate {
+        background: #fef3c7;
+        color: #78350f;
+      }
+
+      .reset {
+        background: #fecaca;
+        color: #7f1d1d;
+      }
+
+      #sketchfab-overlay-root {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 11;
+      }
+
+      .sketchfab-panel,
+      .youtube-panel {
+        position: absolute;
+        left: 50%;
+        bottom: 12px;
+        transform: translateX(-50%);
+        width: min(760px, calc(100vw - 24px));
+        height: min(460px, 58vh);
+        background: rgba(2, 6, 23, 0.95);
+        border: 1px solid rgba(148, 163, 184, 0.4);
+        border-radius: 12px;
+        overflow: hidden;
+        pointer-events: auto;
+      }
+
+      .sketchfab-panel.hidden,
+      .youtube-panel.hidden {
+        display: none;
+      }
+
+      .sketchfab-header,
+      .youtube-header {
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 0 10px;
+        color: #e2e8f0;
+        font-size: 12px;
+        background: rgba(15, 23, 42, 0.95);
+      }
+
+      .sketchfab-close,
+      .youtube-close {
+        border: 0;
+        border-radius: 6px;
+        padding: 5px 8px;
+        font-size: 12px;
+        font-weight: 600;
+        background: #ef4444;
+        color: #fff;
+        cursor: pointer;
+      }
+
+      .sketchfab-panel iframe,
+      .youtube-panel iframe {
+        width: 100%;
+        height: calc(100% - 40px);
+        border: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="status">Ready to start AR.</div>
+    <div id="controls">
+      <button id="start-ar" type="button">Iniciar AR</button>
+    </div>
+    <div id="video-controls" class="hidden">
+      <div id="video-target-label" class="video-target-label">Nenhum video ativo.</div>
+      <button id="video-play" class="video-btn play" type="button" disabled>Play</button>
+      <button id="video-pause" class="video-btn pause" type="button" disabled>Pause</button>
+      <button id="video-stop" class="video-btn stop" type="button" disabled>Stop</button>
+      <button id="video-restart" class="video-btn restart" type="button" disabled>Reiniciar</button>
+      <input id="video-volume" type="range" min="0" max="1" step="0.01" value="1" />
+      <span id="video-volume-label">100%</span>
+    </div>
+    <div id="model-controls" class="hidden">
+      <div id="model-target-label" class="model-target-label">Aguardando target 3D...</div>
+      <button id="model-tour" class="model-btn tour" type="button" disabled>Tour: Off</button>
+      <div class="model-tour-speed-row">
+        <label for="model-tour-speed">Velocidade</label>
+        <input id="model-tour-speed" type="range" min="5" max="120" step="1" value="20" disabled />
+        <span id="model-tour-speed-label" class="model-tour-speed-value">20°/s</span>
+      </div>
+      <button id="model-left" class="model-btn nav" type="button" disabled>⬅️</button>
+      <button id="model-right" class="model-btn nav" type="button" disabled>➡️</button>
+      <button id="model-up" class="model-btn nav" type="button" disabled>⬆️</button>
+      <button id="model-down" class="model-btn nav" type="button" disabled>⬇️</button>
+      <button id="model-forward" class="model-btn nav" type="button" disabled>Z+</button>
+      <button id="model-backward" class="model-btn nav" type="button" disabled>Z-</button>
+      <button id="model-rot-left" class="model-btn rotate" type="button" disabled>⟲</button>
+      <button id="model-rot-right" class="model-btn rotate" type="button" disabled>⟳</button>
+      <button id="model-reset" class="model-btn reset" type="button" disabled>Reset</button>
+      <div class="model-help">Segure os botões para movimento contínuo.</div>
+    </div>
+    <a-scene
+      mindar-image="imageTargetSrc: ./targets.mind; autoStart: false; maxTrack: 4;"
+      color-space="sRGB"
+      renderer="colorManagement: true, physicallyCorrectLights"
+      vr-mode-ui="enabled: false"
+      device-orientation-permission-ui="enabled: false"
+      embedded
+    >
+      <a-assets>
+      </a-assets>
+
+      <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+
+      <a-entity
+        class="mindar-target"
+        mindar-image-target="targetIndex: 0"
+        data-name="alvo-1"
+        data-target-index="0"
+        data-type="sketchfab"
+        data-video-id=""
+        data-video-autoplay="1"
+        data-video-volume="1.0"
+      >
+      </a-entity>
+      <a-entity
+        class="mindar-target"
+        mindar-image-target="targetIndex: 1"
+        data-name="alvo-2"
+        data-target-index="1"
+        data-type="youtube"
+        data-video-id=""
+        data-video-autoplay="1"
+        data-video-volume="1.0"
+      >
+      </a-entity>
+      <a-entity
+        class="mindar-target"
+        mindar-image-target="targetIndex: 2"
+        data-name="alvo-3"
+        data-target-index="2"
+        data-type="sketchfab"
+        data-video-id=""
+        data-video-autoplay="1"
+        data-video-volume="1.0"
+      >
+      </a-entity>
+      <a-entity
+        class="mindar-target"
+        mindar-image-target="targetIndex: 3"
+        data-name="alvo-4"
+        data-target-index="3"
+        data-type="youtube"
+        data-video-id=""
+        data-video-autoplay="1"
+        data-video-volume="1.0"
+      >
+      </a-entity>
+    </a-scene>
+    <div id="sketchfab-overlay-root">
+      <div id="sketchfab-panel-0" class="sketchfab-panel hidden" data-target-index="0">
+        <div class="sketchfab-header">
+          <span>Sketchfab: alvo-1</span>
+          <button class="sketchfab-close" type="button" data-sketchfab-close="0">Fechar</button>
+        </div>
+        <iframe
+          src="https://sketchfab.com/models/9e62134dbe7d4cf0b6daf97db0db4703/embed"
+          allow="autoplay; fullscreen; xr-spatial-tracking"
+          allowfullscreen
+          webkitallowfullscreen="true"
+          mozallowfullscreen="true"
+          xr-spatial-tracking
+          execution-while-out-of-viewport
+          execution-while-not-rendered
+          web-share
+          referrerpolicy="strict-origin-when-cross-origin"
+        ></iframe>
+      </div>
+      <div id="youtube-panel-1" class="youtube-panel hidden" data-target-index="1">
+        <div class="youtube-header">
+          <span>YouTube: alvo-2</span>
+          <button class="youtube-close" type="button" data-youtube-close="1">Fechar</button>
+        </div>
+        <iframe
+          src="https://www.youtube.com/embed/JsYMMtgdPJw?si=BUagjX44nlYG5WUQ"
+          title="YouTube video player"
+          frameborder="0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          referrerpolicy="strict-origin-when-cross-origin"
+          allowfullscreen
+        ></iframe>
+      </div>
+      <div id="sketchfab-panel-2" class="sketchfab-panel hidden" data-target-index="2">
+        <div class="sketchfab-header">
+          <span>Sketchfab: alvo-3</span>
+          <button class="sketchfab-close" type="button" data-sketchfab-close="2">Fechar</button>
+        </div>
+        <iframe
+          src="https://sketchfab.com/models/285e263ae0524c2a97a92b814610ca95/embed"
+          allow="autoplay; fullscreen; xr-spatial-tracking"
+          allowfullscreen
+          webkitallowfullscreen="true"
+          mozallowfullscreen="true"
+          xr-spatial-tracking
+          execution-while-out-of-viewport
+          execution-while-not-rendered
+          web-share
+          referrerpolicy="strict-origin-when-cross-origin"
+        ></iframe>
+      </div>
+      <div id="youtube-panel-3" class="youtube-panel hidden" data-target-index="3">
+        <div class="youtube-header">
+          <span>YouTube: alvo-4</span>
+          <button class="youtube-close" type="button" data-youtube-close="3">Fechar</button>
+        </div>
+        <iframe
+          src="https://www.youtube.com/embed/NSsnjVwP5Vk?si=Q-bqA82Cueqb3m3M"
+          title="YouTube video player"
+          frameborder="0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          referrerpolicy="strict-origin-when-cross-origin"
+          allowfullscreen
+        ></iframe>
+      </div>
+    </div>
+
+    <script>
+      (() => {
+        const status = document.getElementById("status");
+        const startButton = document.getElementById("start-ar");
+        const scene = document.querySelector("a-scene");
+        const targetEntities = document.querySelectorAll(".mindar-target");
+        const allVideos = document.querySelectorAll("video");
+        const videoControls = document.getElementById("video-controls");
+        const videoTargetLabel = document.getElementById("video-target-label");
+        const videoPlayButton = document.getElementById("video-play");
+        const videoPauseButton = document.getElementById("video-pause");
+        const videoStopButton = document.getElementById("video-stop");
+        const videoRestartButton = document.getElementById("video-restart");
+        const videoVolumeInput = document.getElementById("video-volume");
+        const videoVolumeLabel = document.getElementById("video-volume-label");
+        const modelControls = document.getElementById("model-controls");
+        const modelTargetLabel = document.getElementById("model-target-label");
+        const modelTourButton = document.getElementById("model-tour");
+        const modelLeftButton = document.getElementById("model-left");
+        const modelRightButton = document.getElementById("model-right");
+        const modelUpButton = document.getElementById("model-up");
+        const modelDownButton = document.getElementById("model-down");
+        const modelForwardButton = document.getElementById("model-forward");
+        const modelBackwardButton = document.getElementById("model-backward");
+        const modelRotateLeftButton = document.getElementById("model-rot-left");
+        const modelRotateRightButton = document.getElementById("model-rot-right");
+        const modelResetButton = document.getElementById("model-reset");
+        const modelTourSpeedInput = document.getElementById("model-tour-speed");
+        const modelTourSpeedLabel = document.getElementById("model-tour-speed-label");
+        const sketchfabPanels = Array.from(document.querySelectorAll(".sketchfab-panel"));
+        const sketchfabCloseButtons = Array.from(document.querySelectorAll("[data-sketchfab-close]"));
+        const youtubePanels = Array.from(document.querySelectorAll(".youtube-panel"));
+        const youtubeCloseButtons = Array.from(document.querySelectorAll("[data-youtube-close]"));
+        let lastFoundName = "";
+        let activeVideo = null;
+        let activeModel = null;
+        let activeSketchfab = null;
+        let activeYoutube = null;
+        let modelTourEnabled = false;
+        let modelTourFrame = null;
+        let modelTourLastTimestamp = 0;
+        let modelTourSpeed = 20;
+        const modelDefaults = new Map();
+        const hasVideoTargets = Array.from(targetEntities).some((entity) => entity.dataset.type === "video");
+        const hasModelTargets = Array.from(targetEntities).some((entity) => entity.dataset.type === "model3d");
+        const modelMoveStep = 0.05;
+        const modelRotateStep = 8;
+        const modelHoldIntervalMs = 70;
+
+        const setStatus = (message) => {
+          status.textContent = message;
+        };
+
+        const clampVolume = (value) => {
+          const parsed = Number(value);
+          if (!Number.isFinite(parsed)) {
+            return 1;
+          }
+          return Math.max(0, Math.min(1, parsed));
+        };
+
+        const clampTourSpeed = (value) => {
+          const parsed = Number(value);
+          if (!Number.isFinite(parsed)) {
+            return 20;
+          }
+          return Math.max(5, Math.min(120, parsed));
+        };
+
+        const readVector = (rawValue, fallback) => {
+          const fallbackValue = {
+            x: fallback.x,
+            y: fallback.y,
+            z: fallback.z,
+          };
+          if (rawValue && typeof rawValue === "object") {
+            const x = Number(rawValue.x);
+            const y = Number(rawValue.y);
+            const z = Number(rawValue.z);
+            return {
+              x: Number.isFinite(x) ? x : fallbackValue.x,
+              y: Number.isFinite(y) ? y : fallbackValue.y,
+              z: Number.isFinite(z) ? z : fallbackValue.z,
+            };
+          }
+          if (typeof rawValue === "string") {
+            const pieces = rawValue.trim().split(/\s+/);
+            if (pieces.length === 3) {
+              const x = Number(pieces[0]);
+              const y = Number(pieces[1]);
+              const z = Number(pieces[2]);
+              return {
+                x: Number.isFinite(x) ? x : fallbackValue.x,
+                y: Number.isFinite(y) ? y : fallbackValue.y,
+                z: Number.isFinite(z) ? z : fallbackValue.z,
+              };
+            }
+          }
+          return fallbackValue;
+        };
+
+        const readElementVector = (element, attributeName, fallback) =>
+          readVector(element.getAttribute(attributeName), fallback);
+
+        const writeElementVector = (element, attributeName, value) => {
+          element.setAttribute(attributeName, `${value.x.toFixed(3)} ${value.y.toFixed(3)} ${value.z.toFixed(3)}`);
+        };
+
+        const setVolumeLabel = (value) => {
+          const percentage = Math.round(clampVolume(value) * 100);
+          videoVolumeLabel.textContent = `${percentage}%`;
+        };
+
+        const setTourSpeedLabel = (value) => {
+          modelTourSpeedLabel.textContent = `${Math.round(clampTourSpeed(value))}°/s`;
+        };
+
+        const setVideoButtonsEnabled = (enabled) => {
+          videoPlayButton.disabled = !enabled;
+          videoPauseButton.disabled = !enabled;
+          videoStopButton.disabled = !enabled;
+          videoRestartButton.disabled = !enabled;
+          videoVolumeInput.disabled = !enabled;
+        };
+
+        const setModelButtonsEnabled = (enabled) => {
+          modelTourButton.disabled = !enabled;
+          modelTourSpeedInput.disabled = !enabled;
+          modelLeftButton.disabled = !enabled;
+          modelRightButton.disabled = !enabled;
+          modelUpButton.disabled = !enabled;
+          modelDownButton.disabled = !enabled;
+          modelForwardButton.disabled = !enabled;
+          modelBackwardButton.disabled = !enabled;
+          modelRotateLeftButton.disabled = !enabled;
+          modelRotateRightButton.disabled = !enabled;
+          modelResetButton.disabled = !enabled;
+        };
+
+        const bindRepeatButton = (button, action) => {
+          let repeatTimer = null;
+          let pointerPressed = false;
+
+          const stop = () => {
+            pointerPressed = false;
+            if (repeatTimer !== null) {
+              clearInterval(repeatTimer);
+              repeatTimer = null;
+            }
+          };
+
+          const start = (event) => {
+            if (button.disabled || !activeModel) {
+              return;
+            }
+            event.preventDefault();
+            pointerPressed = true;
+            action();
+            repeatTimer = setInterval(() => {
+              if (!pointerPressed || button.disabled || !activeModel) {
+                stop();
+                return;
+              }
+              action();
+            }, modelHoldIntervalMs);
+          };
+
+          button.addEventListener("pointerdown", start);
+          button.addEventListener("pointerup", stop);
+          button.addEventListener("pointercancel", stop);
+          button.addEventListener("pointerleave", stop);
+          button.addEventListener("lostpointercapture", stop);
+          button.addEventListener("blur", stop);
+          button.addEventListener("click", (event) => {
+            // Keyboard-triggered click has detail 0.
+            if (event.detail !== 0 || button.disabled || !activeModel) {
+              return;
+            }
+            action();
+          });
+        };
+
+        const setModelTourState = (enabled) => {
+          modelTourEnabled = enabled;
+          modelTourButton.textContent = `Tour: ${enabled ? "On" : "Off"}`;
+          modelTourButton.classList.toggle("active", enabled);
+        };
+
+        const stopModelTour = () => {
+          if (modelTourFrame !== null) {
+            cancelAnimationFrame(modelTourFrame);
+            modelTourFrame = null;
+          }
+          modelTourLastTimestamp = 0;
+          setModelTourState(false);
+        };
+
+        const startModelTour = () => {
+          if (!activeModel || modelTourFrame !== null) {
+            return;
+          }
+          setModelTourState(true);
+          const tick = (timestamp) => {
+            if (!modelTourEnabled || !activeModel) {
+              modelTourFrame = null;
+              modelTourLastTimestamp = 0;
+              return;
+            }
+            if (!modelTourLastTimestamp) {
+              modelTourLastTimestamp = timestamp;
+            }
+            const deltaSeconds = Math.max(0, (timestamp - modelTourLastTimestamp) / 1000);
+            modelTourLastTimestamp = timestamp;
+            const rotation = readElementVector(activeModel.element, "rotation", activeModel.defaultRotation);
+            rotation.y += modelTourSpeed * deltaSeconds;
+            writeElementVector(activeModel.element, "rotation", rotation);
+            modelTourFrame = requestAnimationFrame(tick);
+          };
+          modelTourFrame = requestAnimationFrame(tick);
+        };
+
+        const toggleModelTour = () => {
+          if (!activeModel) {
+            return;
+          }
+          if (modelTourEnabled) {
+            stopModelTour();
+            return;
+          }
+          startModelTour();
+        };
+
+        const setActiveModel = (element, targetName) => {
+          stopModelTour();
+          const modelId = element.dataset.modelId || "";
+          const defaultState = modelDefaults.get(modelId) || {
+            position: readElementVector(element, "position", { x: 0, y: 0, z: 0 }),
+            rotation: readElementVector(element, "rotation", { x: 0, y: 0, z: 0 }),
+          };
+          activeModel = {
+            element,
+            targetName,
+            defaultPosition: {
+              x: defaultState.position.x,
+              y: defaultState.position.y,
+              z: defaultState.position.z,
+            },
+            defaultRotation: {
+              x: defaultState.rotation.x,
+              y: defaultState.rotation.y,
+              z: defaultState.rotation.z,
+            },
+          };
+          modelTargetLabel.textContent = `Modelo ativo: ${targetName}`;
+          setModelButtonsEnabled(true);
+        };
+
+        const clearActiveModel = (targetName) => {
+          if (!activeModel || activeModel.targetName !== targetName) {
+            return;
+          }
+          stopModelTour();
+          activeModel = null;
+          modelTargetLabel.textContent = "Aguardando target 3D...";
+          setModelButtonsEnabled(false);
+        };
+
+        const moveActiveModel = (dx, dy, dz) => {
+          if (!activeModel) {
+            return;
+          }
+          const current = readElementVector(activeModel.element, "position", activeModel.defaultPosition);
+          current.x += dx;
+          current.y += dy;
+          current.z += dz;
+          writeElementVector(activeModel.element, "position", current);
+        };
+
+        const rotateActiveModel = (dy) => {
+          if (!activeModel) {
+            return;
+          }
+          const current = readElementVector(activeModel.element, "rotation", activeModel.defaultRotation);
+          current.y += dy;
+          writeElementVector(activeModel.element, "rotation", current);
+        };
+
+        const resetActiveModel = () => {
+          if (!activeModel) {
+            return;
+          }
+          stopModelTour();
+          writeElementVector(activeModel.element, "position", activeModel.defaultPosition);
+          writeElementVector(activeModel.element, "rotation", activeModel.defaultRotation);
+        };
+
+        const setActiveVideo = (video, targetName) => {
+          activeVideo = { video, targetName };
+          videoTargetLabel.textContent = `Video ativo: ${targetName}`;
+          videoVolumeInput.value = String(clampVolume(video.volume));
+          setVolumeLabel(video.volume);
+          setVideoButtonsEnabled(true);
+        };
+
+        const clearActiveVideo = (targetName) => {
+          if (!activeVideo || activeVideo.targetName !== targetName) {
+            return;
+          }
+          activeVideo = null;
+          videoTargetLabel.textContent = "Aguardando um target com video...";
+          setVideoButtonsEnabled(false);
+        };
+
+        const resetEmbeddedIframe = (panel) => {
+          const iframe = panel.querySelector("iframe");
+          if (!iframe) {
+            return;
+          }
+          const source = iframe.getAttribute("src") || "";
+          iframe.setAttribute("src", source);
+        };
+
+        const hideActiveSketchfab = () => {
+          if (!activeSketchfab) {
+            return;
+          }
+          resetEmbeddedIframe(activeSketchfab.panel);
+          activeSketchfab.panel.classList.add("hidden");
+          activeSketchfab = null;
+        };
+
+        const showSketchfabPanel = (targetIndex, targetName) => {
+          const panel = document.getElementById(`sketchfab-panel-${targetIndex}`);
+          if (!panel) {
+            return;
+          }
+          hideActiveYoutube();
+          if (activeSketchfab && activeSketchfab.panel !== panel) {
+            activeSketchfab.panel.classList.add("hidden");
+          }
+          panel.classList.remove("hidden");
+          activeSketchfab = {
+            targetIndex: String(targetIndex),
+            panel,
+          };
+          setStatus(`Sketchfab ativo: ${targetName}`);
+        };
+
+        const hideActiveYoutube = () => {
+          if (!activeYoutube) {
+            return;
+          }
+          resetEmbeddedIframe(activeYoutube.panel);
+          activeYoutube.panel.classList.add("hidden");
+          activeYoutube = null;
+        };
+
+        const showYoutubePanel = (targetIndex, targetName) => {
+          const panel = document.getElementById(`youtube-panel-${targetIndex}`);
+          if (!panel) {
+            return;
+          }
+          hideActiveSketchfab();
+          if (activeYoutube && activeYoutube.panel !== panel) {
+            activeYoutube.panel.classList.add("hidden");
+          }
+          panel.classList.remove("hidden");
+          activeYoutube = {
+            targetIndex: String(targetIndex),
+            panel,
+          };
+          setStatus(`YouTube ativo: ${targetName}`);
+        };
+
+        if (hasVideoTargets) {
+          videoControls.classList.remove("hidden");
+          videoTargetLabel.textContent = "Aguardando um target com video...";
+          setVideoButtonsEnabled(false);
+          setVolumeLabel(1);
+        }
+
+        if (hasModelTargets) {
+          modelControls.classList.remove("hidden");
+          modelTargetLabel.textContent = "Aguardando target 3D...";
+          setModelButtonsEnabled(false);
+          setModelTourState(false);
+          modelTourSpeed = clampTourSpeed(modelTourSpeedInput.value);
+          modelTourSpeedInput.value = String(modelTourSpeed);
+          setTourSpeedLabel(modelTourSpeed);
+          document.querySelectorAll(".mindar-model").forEach((modelElement, index) => {
+            if (!modelElement.dataset.modelId) {
+              modelElement.dataset.modelId = `model-${index}`;
+            }
+            modelDefaults.set(modelElement.dataset.modelId, {
+              position: readElementVector(modelElement, "position", { x: 0, y: 0, z: 0 }),
+              rotation: readElementVector(modelElement, "rotation", { x: 0, y: 0, z: 0 }),
+            });
+          });
+
+          modelTourButton.addEventListener("click", () => {
+            toggleModelTour();
+          });
+          modelTourSpeedInput.addEventListener("input", () => {
+            modelTourSpeed = clampTourSpeed(modelTourSpeedInput.value);
+            modelTourSpeedInput.value = String(modelTourSpeed);
+            setTourSpeedLabel(modelTourSpeed);
+          });
+
+          bindRepeatButton(modelLeftButton, () => {
+            moveActiveModel(-modelMoveStep, 0, 0);
+          });
+          bindRepeatButton(modelRightButton, () => {
+            moveActiveModel(modelMoveStep, 0, 0);
+          });
+          bindRepeatButton(modelUpButton, () => {
+            moveActiveModel(0, modelMoveStep, 0);
+          });
+          bindRepeatButton(modelDownButton, () => {
+            moveActiveModel(0, -modelMoveStep, 0);
+          });
+          bindRepeatButton(modelForwardButton, () => {
+            moveActiveModel(0, 0, modelMoveStep);
+          });
+          bindRepeatButton(modelBackwardButton, () => {
+            moveActiveModel(0, 0, -modelMoveStep);
+          });
+          bindRepeatButton(modelRotateLeftButton, () => {
+            rotateActiveModel(-modelRotateStep);
+          });
+          bindRepeatButton(modelRotateRightButton, () => {
+            rotateActiveModel(modelRotateStep);
+          });
+          modelResetButton.addEventListener("click", () => {
+            resetActiveModel();
+          });
+        }
+
+        if (sketchfabPanels.length > 0) {
+          sketchfabCloseButtons.forEach((button) => {
+            button.addEventListener("click", () => {
+              hideActiveSketchfab();
+            });
+          });
+        }
+
+        if (youtubePanels.length > 0) {
+          youtubeCloseButtons.forEach((button) => {
+            button.addEventListener("click", () => {
+              hideActiveYoutube();
+            });
+          });
+        }
+
+        if (window.location.protocol === "file:") {
+          startButton.disabled = true;
+          setStatus("Abra via HTTP/HTTPS. Nao use file:// para MindAR.");
+          return;
+        }
+
+        scene.addEventListener("loaded", () => {
+          setStatus("Pressione 'Iniciar AR' e aponte para o target.");
+        });
+
+        const unlockAllVideos = async () => {
+          for (const video of allVideos) {
+            const defaultVolume = clampVolume(video.dataset.defaultVolume || "1");
+            video.muted = true;
+            video.loop = true;
+            video.playsInline = true;
+            video.setAttribute("muted", "");
+            video.setAttribute("playsinline", "");
+            video.setAttribute("webkit-playsinline", "");
+            try {
+              await video.play();
+              video.pause();
+              video.currentTime = 0;
+            } catch (error) {
+              // Ignore. Playback can still succeed after targetFound in many browsers.
+            }
+            video.removeAttribute("muted");
+            video.muted = false;
+            video.volume = defaultVolume;
+          }
+        };
+
+        videoPlayButton.addEventListener("click", async () => {
+          if (!activeVideo) {
+            return;
+          }
+          try {
+            await activeVideo.video.play();
+          } catch (error) {
+            setStatus("Nao foi possivel iniciar o video.");
+          }
+        });
+
+        videoPauseButton.addEventListener("click", () => {
+          if (!activeVideo) {
+            return;
+          }
+          activeVideo.video.pause();
+        });
+
+        videoStopButton.addEventListener("click", () => {
+          if (!activeVideo) {
+            return;
+          }
+          activeVideo.video.pause();
+          activeVideo.video.currentTime = 0;
+        });
+
+        videoRestartButton.addEventListener("click", async () => {
+          if (!activeVideo) {
+            return;
+          }
+          activeVideo.video.currentTime = 0;
+          try {
+            await activeVideo.video.play();
+          } catch (error) {
+            setStatus("Nao foi possivel reiniciar o video.");
+          }
+        });
+
+        videoVolumeInput.addEventListener("input", () => {
+          const value = clampVolume(videoVolumeInput.value);
+          setVolumeLabel(value);
+          if (!activeVideo) {
+            return;
+          }
+          activeVideo.video.muted = false;
+          activeVideo.video.volume = value;
+        });
+
+        startButton.addEventListener("click", async () => {
+          const arSystem = scene.systems["mindar-image-system"];
+          if (!arSystem) {
+            setStatus("Sistema AR ainda não carregou.");
+            return;
+          }
+          try {
+            startButton.disabled = true;
+            await unlockAllVideos();
+            await arSystem.start();
+            setStatus("Camera iniciada. Aponte para o target.");
+          } catch (error) {
+            startButton.disabled = false;
+            setStatus("Erro ao iniciar AR. Verifique permissao da camera.");
+          }
+        });
+
+        scene.addEventListener("arReady", () => {
+          setStatus("AR pronto. Procure a imagem de referencia.");
+        });
+
+        scene.addEventListener("arError", () => {
+          startButton.disabled = false;
+          setStatus("Erro AR. Verifique camera, HTTPS e permissao.");
+        });
+
+        targetEntities.forEach((entity) => {
+          const targetName = entity.dataset.name || `target ${entity.dataset.targetIndex || "?"}`;
+          const type = entity.dataset.type;
+
+          entity.addEventListener("targetFound", () => {
+            lastFoundName = targetName;
+            setStatus(`Gatilho aberto: ${targetName}`);
+          });
+
+          entity.addEventListener("targetLost", () => {
+            if (lastFoundName === targetName) {
+              setStatus(`Target perdido: ${targetName}. Reposicione a camera.`);
+            }
+          });
+
+          if (type === "model3d") {
+            const modelElement = entity.querySelector(".mindar-model");
+            if (!modelElement) {
+              return;
+            }
+
+            entity.addEventListener("targetFound", () => {
+              setActiveModel(modelElement, targetName);
+            });
+
+            entity.addEventListener("targetLost", () => {
+              clearActiveModel(targetName);
+            });
+            return;
+          }
+
+          if (type === "sketchfab") {
+            const targetIndex = entity.dataset.targetIndex || "";
+            entity.addEventListener("targetFound", () => {
+              showSketchfabPanel(targetIndex, targetName);
+            });
+
+            entity.addEventListener("targetLost", () => {
+              if (!activeSketchfab || activeSketchfab.targetIndex !== String(targetIndex)) {
+                return;
+              }
+              hideActiveSketchfab();
+            });
+            return;
+          }
+
+          if (type === "youtube") {
+            const targetIndex = entity.dataset.targetIndex || "";
+            entity.addEventListener("targetFound", () => {
+              showYoutubePanel(targetIndex, targetName);
+            });
+
+            entity.addEventListener("targetLost", () => {
+              if (!activeYoutube || activeYoutube.targetIndex !== String(targetIndex)) {
+                return;
+              }
+              hideActiveYoutube();
+            });
+            return;
+          }
+
+          if (type !== "video") {
+            return;
+          }
+
+          const videoId = entity.dataset.videoId;
+          const autoplay = entity.dataset.videoAutoplay === "1";
+          const defaultVolume = clampVolume(entity.dataset.videoVolume || "1");
+          const video = document.getElementById(videoId);
+          if (!video) {
+            return;
+          }
+          video.dataset.defaultVolume = String(defaultVolume);
+          video.volume = defaultVolume;
+          video.muted = false;
+
+          video.addEventListener("error", () => {
+            setStatus(`Falha ao carregar video do target: ${targetName}`);
+          });
+
+          entity.addEventListener("targetFound", async () => {
+            setActiveVideo(video, targetName);
+            if (!autoplay) {
+              return;
+            }
+            try {
+              await video.play();
+            } catch (error) {
+              setStatus("Video bloqueado pela politica do navegador.");
+            }
+          });
+
+          entity.addEventListener("targetLost", () => {
+            video.pause();
+            clearActiveVideo(targetName);
+          });
+        });
+      })();
+    </script>
+  </body>
+</html>
